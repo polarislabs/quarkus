@@ -17,10 +17,10 @@ import javax.sql.XADataSource;
 import javax.transaction.TransactionManager;
 import javax.transaction.TransactionSynchronizationRegistry;
 
-import io.agroal.api.AgroalDataSourceListener;
 import org.jboss.logging.Logger;
 
 import io.agroal.api.AgroalDataSource;
+import io.agroal.api.AgroalDataSourceListener;
 import io.agroal.api.configuration.AgroalConnectionPoolConfiguration.ConnectionValidator;
 import io.agroal.api.configuration.supplier.AgroalConnectionFactoryConfigurationSupplier;
 import io.agroal.api.configuration.supplier.AgroalConnectionPoolConfigurationSupplier;
@@ -48,7 +48,7 @@ public abstract class AbstractDataSourceProducer {
 
     @Inject
     public TransactionSynchronizationRegistry transactionSynchronizationRegistry;
-    
+
     @Inject
     public BeanManager beanManager;
 
@@ -205,16 +205,16 @@ public abstract class AbstractDataSourceProducer {
                 .map(beanDef -> new PrioritizedDataSourceListenerWrapper((Bean<AgroalDataSourceListener>) beanDef))
                 .filter(pds -> pds.appliesTo(dataSourceName))
                 .collect(Collectors.toList());
-    
+
         // Add the default event logging listener..
         listeners.add(new PrioritizedDataSourceListenerWrapper(
                 new AgroalEventLoggingListener(dataSourceName), 0, dataSourceName));
-    
+
         // Explicit reference to bypass reflection need of the ServiceLoader used by AgroalDataSource#from
         AgroalDataSource dataSource = new io.agroal.pool.DataSource(dataSourceConfiguration.get(),
                 listeners.stream().sorted().map(listenersWrapper -> listenersWrapper.listener)
                         .toArray(size -> new AgroalDataSourceListener[size]));
-    
+
         log.debugv("Started data source {0} connected to {1}", dataSource, url);
         this.dataSources.add(dataSource);
 
@@ -248,7 +248,7 @@ public abstract class AbstractDataSourceProducer {
             }
         }
     }
-    
+
     /**
      * Wrapper to facilitate filtering & sorting of applicable CDI produced AgroalDataSourceListeners
      */
@@ -256,29 +256,29 @@ public abstract class AbstractDataSourceProducer {
         final AgroalDataSourceListener listener;
         final int priority;
         final String dataSourceName;
-        
+
         PrioritizedDataSourceListenerWrapper(final AgroalDataSourceListener listener, final int priority,
-                                             final String dataSourceName) {
+                final String dataSourceName) {
             this.listener = listener;
             this.priority = priority;
             this.dataSourceName = dataSourceName;
         }
-        
+
         PrioritizedDataSourceListenerWrapper(final Bean<AgroalDataSourceListener> listener) {
             this.listener = (AgroalDataSourceListener) beanManager.getReference(listener, listener.getBeanClass(),
                     beanManager.createCreationalContext(listener));
-            
+
             Priority p = listener.getBeanClass().getAnnotation(Priority.class);
             this.priority = p != null ? p.value() : Interceptor.Priority.APPLICATION;
-            
+
             io.quarkus.agroal.DataSource ds = listener.getBeanClass().getAnnotation(io.quarkus.agroal.DataSource.class);
             this.dataSourceName = ds != null ? ds.value() : null;
         }
-        
+
         boolean appliesTo(final String dataSourceNamed) {
             return dataSourceName == null || dataSourceName.equals(dataSourceNamed);
         }
-        
+
         @Override
         public int compareTo(final PrioritizedDataSourceListenerWrapper o) {
             return Integer.compare(this.priority, o.priority);
