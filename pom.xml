@@ -101,12 +101,28 @@
     <profiles>
         <profile>
             <id>polaris-release</id>
-            <repositories>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>repo.horizonpro</id>
+                    <url>s3://maven-eoilreports/snapshot</url>
+                </snapshotRepository>
                 <repository>
                     <id>repo.horizonpro</id>
                     <url>s3://maven-eoilreports/release</url>
                 </repository>
+            </distributionManagement>
+            <repositories>
+                <repository>
+                    <id>sonatype-nexus-release</id>
+                    <url>s3://maven-eoilreports/release</url>
+                </repository>
             </repositories>
+            <distributionManagement>
+                <repository>
+                    <id>sonatype-nexus-release</id>
+                    <url>s3://maven-eoilreports/release</url>
+                </repository>
+            </distributionManagement>
             <build>
                 <plugins>
                     <plugin>
