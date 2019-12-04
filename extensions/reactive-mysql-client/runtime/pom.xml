@@ -23,7 +23,7 @@
     <parent>
         <groupId>io.quarkus</groupId>
         <artifactId>quarkus-reactive-mysql-client-parent</artifactId>
-        <version>1.0.1.Final</version>
+        <version>1.0.1.FinalAuditSupport</version>
         <relativePath>../</relativePath>
     </parent>
 
