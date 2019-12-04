@@ -101,6 +101,16 @@
     <profiles>
         <profile>
             <id>polaris-release</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>repo.horizonpro</id>
+                    <url>s3://maven-eoilreports/snapshot</url>
+                </snapshotRepository>
+                <repository>
+                    <id>repo.horizonpro</id>
+                    <url>s3://maven-eoilreports/release</url>
+                </repository>
+            </distributionManagement>
             <repositories>
                 <repository>
                     <id>repo.horizonpro</id>
