@@ -117,12 +117,6 @@
                     <url>s3://maven-eoilreports/release</url>
                 </repository>
             </repositories>
-            <distributionManagement>
-                <repository>
-                    <id>sonatype-nexus-release</id>
-                    <url>s3://maven-eoilreports/release</url>
-                </repository>
-            </distributionManagement>
             <build>
                 <plugins>
                     <plugin>
