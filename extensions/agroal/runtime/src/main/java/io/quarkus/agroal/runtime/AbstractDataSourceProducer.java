@@ -4,14 +4,20 @@ import java.sql.Driver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import javax.annotation.PreDestroy;
+import javax.annotation.Priority;
+import javax.enterprise.inject.spi.Bean;
+import javax.enterprise.inject.spi.BeanManager;
 import javax.inject.Inject;
+import javax.interceptor.Interceptor;
 import javax.sql.DataSource;
 import javax.sql.XADataSource;
 import javax.transaction.TransactionManager;
 import javax.transaction.TransactionSynchronizationRegistry;
 
+import io.agroal.api.AgroalDataSourceListener;
 import org.jboss.logging.Logger;
 
 import io.agroal.api.AgroalDataSource;
@@ -42,6 +48,9 @@ public abstract class AbstractDataSourceProducer {
 
     @Inject
     public TransactionSynchronizationRegistry transactionSynchronizationRegistry;
+    
+    @Inject
+    public BeanManager beanManager;
 
     public DataSourceBuildTimeConfig getDefaultBuildTimeConfig() {
         return buildTimeConfig.defaultDataSource;
@@ -191,11 +200,22 @@ public abstract class AbstractDataSourceProducer {
             }
         }
 
+        // Identify AgroalDataSourceListener beans and filter appropriately to this dataSourceName.
+        List<PrioritizedDataSourceListenerWrapper> listeners = beanManager.getBeans(AgroalDataSourceListener.class).stream()
+                .map(beanDef -> new PrioritizedDataSourceListenerWrapper((Bean<AgroalDataSourceListener>) beanDef))
+                .filter(pds -> pds.appliesTo(dataSourceName))
+                .collect(Collectors.toList());
+    
+        // Add the default event logging listener..
+        listeners.add(new PrioritizedDataSourceListenerWrapper(
+                new AgroalEventLoggingListener(dataSourceName), 0, dataSourceName));
+    
         // Explicit reference to bypass reflection need of the ServiceLoader used by AgroalDataSource#from
         AgroalDataSource dataSource = new io.agroal.pool.DataSource(dataSourceConfiguration.get(),
-                new AgroalEventLoggingListener(dataSourceName));
+                listeners.stream().sorted().map(listenersWrapper -> listenersWrapper.listener)
+                        .toArray(size -> new AgroalDataSourceListener[size]));
+    
         log.debugv("Started data source {0} connected to {1}", dataSource, url);
-
         this.dataSources.add(dataSource);
 
         return dataSource;
@@ -226,6 +246,42 @@ public abstract class AbstractDataSourceProducer {
             if (dataSource != null) {
                 dataSource.close();
             }
+        }
+    }
+    
+    /**
+     * Wrapper to facilitate filtering & sorting of applicable CDI produced AgroalDataSourceListeners
+     */
+    private class PrioritizedDataSourceListenerWrapper implements Comparable<PrioritizedDataSourceListenerWrapper> {
+        final AgroalDataSourceListener listener;
+        final int priority;
+        final String dataSourceName;
+        
+        PrioritizedDataSourceListenerWrapper(final AgroalDataSourceListener listener, final int priority,
+                                             final String dataSourceName) {
+            this.listener = listener;
+            this.priority = priority;
+            this.dataSourceName = dataSourceName;
+        }
+        
+        PrioritizedDataSourceListenerWrapper(final Bean<AgroalDataSourceListener> listener) {
+            this.listener = (AgroalDataSourceListener) beanManager.getReference(listener, listener.getBeanClass(),
+                    beanManager.createCreationalContext(listener));
+            
+            Priority p = listener.getBeanClass().getAnnotation(Priority.class);
+            this.priority = p != null ? p.value() : Interceptor.Priority.APPLICATION;
+            
+            io.quarkus.agroal.DataSource ds = listener.getBeanClass().getAnnotation(io.quarkus.agroal.DataSource.class);
+            this.dataSourceName = ds != null ? ds.value() : null;
+        }
+        
+        boolean appliesTo(final String dataSourceNamed) {
+            return dataSourceName == null || dataSourceName.equals(dataSourceNamed);
+        }
+        
+        @Override
+        public int compareTo(final PrioritizedDataSourceListenerWrapper o) {
+            return Integer.compare(this.priority, o.priority);
         }
     }
 }
